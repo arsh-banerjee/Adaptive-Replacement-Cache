@@ -1,7 +1,7 @@
 /******************************************************************************
 Filename: arc.go
 Names: Arsh Banerjee, Kenny Lam, and Kenar Vyas
-NetId:
+NetId: arshb
 Description:
 *****************************************************************************/
 
@@ -50,7 +50,7 @@ func (arc *ARC) Set(key string, value []byte) bool {
 	return false
 }
 
-// Len returns the number of bindings in the FIFO.
+// Len returns the number of bindings in the ARC.
 func (arc *ARC) Len() int {
 	return 0
 }
