@@ -8,7 +8,6 @@ Description:
 package arc
 
 import (
-	"container/list"
 	"sync"
 )
 
