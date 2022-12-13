@@ -29,7 +29,16 @@ type entry struct {
 
 // NewARC returns a pointer to a new ARC with a capacity to store limit bytes
 func NewArc(limit int) *ARC {
-	return &ARC{limit: limit, lock: new(sync.Mutex)}
+	return &ARC{
+		limit: limit, lock: new(sync.Mutex),
+		currentUsage: 0,
+		T:            make(map[string]*entry, limit),
+		splitIndex:   int(limit/2) - 1,
+		b1:           make(map[string]string),
+		b2:           make(map[string]string),
+		cacheOrder:   make([]string, limit),
+		lock:         new(sync.Mutex),
+	}
 }
 
 // MaxStorage returns the maximum number of bytes this ARC can store
@@ -56,19 +65,39 @@ func (arc *ARC) Get(key string) (value []byte, ok bool) {
 		for i := 0; i < arc.limit; i++ {
 			if key == arc.cacheOrder[i] {
 				index = i
+				break
 			}
 		}
 		// if in LRU portion of cache
 		if index < arc.splitIndex+1 {
 
 		} else {
-			// if in LFU portion of cache
-			for i := index + 1; i < arc.limit; i++ {
-
-			}
+			// if in LFU portion of cache, move the cache entry to the front of the LFU list
+			newOrder := make([]string, arc.splitIndex)
+			firstHalf := arc.cacheOrder[arc.splitIndex+1 : index]
+			secondHalf := arc.cacheOrder[index:]
+			val := arc.cacheOrder[index]
+			copy(newOrder, arc.cacheOrder[0:arc.splitIndex+1])
+			newOrder = append(newOrder, val)
+			newOrder = append(newOrder, firstHalf...)
+			newOrder = append(newOrder, secondHalf...)
+			arc.cacheOrder = newOrder
 
 		}
 		return val.Value, true
+	}
+
+	_, prsB1 := arc.b1[key]
+	if prsB1 {
+
+		return nil, false
+
+	}
+
+	_, prsB2 := arc.b2[key]
+	if prsB2 {
+
+		return nil, false
 	}
 
 	return nil, false
