@@ -23,9 +23,8 @@ type ARC struct {
 }
 
 type entry struct {
-	Key       string
-	Value     []byte
-	Frequency int
+	Key   string
+	Value []byte
 }
 
 // NewARC returns a pointer to a new ARC with a capacity to store limit bytes
