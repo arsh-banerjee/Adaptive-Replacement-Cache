@@ -15,7 +15,7 @@ type ARC struct {
 	limit        int
 	currentUsage int
 	T            map[string]*entry
-	splitIndex   int //Index that divides T into t1 and t2
+	splitIndex   int //Index that divides T into t1 and t2. cacheOrder[splitIndex] is the last element in T1
 	b1           map[string]string
 	b2           map[string]string
 	cacheOrder   []string // represents the order of cache entries
@@ -30,14 +30,14 @@ type entry struct {
 // NewARC returns a pointer to a new ARC with a capacity to store limit bytes
 func NewArc(limit int) *ARC {
 	return &ARC{
-		limit: limit, lock: new(sync.Mutex),
+		limit:        limit,
+		lock:         new(sync.Mutex),
 		currentUsage: 0,
 		T:            make(map[string]*entry, limit),
 		splitIndex:   int(limit/2) - 1,
 		b1:           make(map[string]string),
 		b2:           make(map[string]string),
 		cacheOrder:   make([]string, limit),
-		lock:         new(sync.Mutex),
 	}
 }
 
@@ -73,15 +73,14 @@ func (arc *ARC) Get(key string) (value []byte, ok bool) {
 
 		} else {
 			// if in LFU portion of cache, move the cache entry to the front of the LFU list
-			newOrder := make([]string, arc.splitIndex)
-			firstHalf := arc.cacheOrder[arc.splitIndex+1 : index]
-			secondHalf := arc.cacheOrder[index:]
 			val := arc.cacheOrder[index]
-			copy(newOrder, arc.cacheOrder[0:arc.splitIndex+1])
-			newOrder = append(newOrder, val)
-			newOrder = append(newOrder, firstHalf...)
-			newOrder = append(newOrder, secondHalf...)
-			arc.cacheOrder = newOrder
+			temp := arc.cacheOrder[arc.splitIndex+1]
+			for i := arc.splitIndex + 1; i <= index; i++ {
+				innerTemp := arc.cacheOrder[i]
+				arc.cacheOrder[i] = temp
+				temp = innerTemp
+			}
+			arc.cacheOrder[arc.splitIndex+1] = val
 
 		}
 		return val.Value, true
