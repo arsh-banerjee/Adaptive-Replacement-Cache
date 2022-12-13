@@ -18,12 +18,14 @@ type ARC struct {
 	splitIndex   int //Index that divides T into t1 and t2
 	b1           map[string]string
 	b2           map[string]string
+	cacheOrder   []string // represents the order of cache entries
 	lock         *sync.Mutex
 }
 
 type entry struct {
-	Key   string
-	Value []byte
+	Key       string
+	Value     []byte
+	Frequency int
 }
 
 // NewARC returns a pointer to a new ARC with a capacity to store limit bytes
@@ -51,6 +53,22 @@ func (arc *ARC) Get(key string) (value []byte, ok bool) {
 	val, prs := arc.T[key]
 
 	if prs {
+		var index int
+		for i := 0; i < arc.limit; i++ {
+			if key == arc.cacheOrder[i] {
+				index = i
+			}
+		}
+		// if in LRU portion of cache
+		if index < arc.splitIndex+1 {
+
+		} else {
+			// if in LFU portion of cache
+			for i := index + 1; i < arc.limit; i++ {
+
+			}
+
+		}
 		return val.Value, true
 	}
 
@@ -75,5 +93,5 @@ func (arc *ARC) Set(key string, value []byte) bool {
 
 // Len returns the number of bindings in the ARC.
 func (arc *ARC) Len() int {
-	return 0
+	return arc.currentUsage
 }
