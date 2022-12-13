@@ -9,11 +9,13 @@ package arc
 
 import (
 	"sync"
+	"log"
 )
 
 type ARC struct {
 	limit        int
 	currentUsage int
+	len			 int
 	T            map[string]*entry
 	splitIndex   int //Index that divides T into t1 and t2
 	b1           map[string]string
@@ -78,7 +80,44 @@ func (arc *ARC) Get(key string) (value []byte, ok bool) {
 // ok is true if a value was found and false otherwise
 func (arc *ARC) Remove(key string) (value []byte, ok bool) {
 
-	return nil, false
+	val, ok := arc.T[key]
+
+	if !ok {
+		return nil, false
+	}
+
+	index := arc.GetIndex(key)
+
+	if index == -1 {
+		log.Fatalf("key not found")
+	} else {
+		arc.cacheOrder := append(arc.cacheOrder[:index], arc.cacheOrder[index+1:]...)
+
+		// TODO: make sure this is consistent with Get
+		if index < arc.splitIndex+1 {
+			arc.splitIndex -= 1
+		} else {
+			arc.splitIndex += 1
+		}
+	}
+
+	delete(arc.T, key)
+
+	// Update b1 / b2
+	_, ok := arc.b1[key]
+	if ok {
+		delete(arc.b1, key)
+	}
+	_, ok := arc.b1[key]
+
+	if ok {
+		delete(arc.b2, key)
+	}
+
+	arc.currentUsage -= (len(val.Value) + len(val.Key))
+	arc.len -= 1
+
+	return val.Value, true
 }
 
 // Set associates the given value with the given key, possibly evicting values
@@ -87,10 +126,61 @@ func (arc *ARC) Set(key string, value []byte) bool {
 	arc.lock.Lock()
 	defer arc.lock.Unlock()
 
-	return false
+	if len(value) + len(key) > arc.limit {
+		return false
+	}
+
+	val, ok := arc.T[key]
+
+	if !ok {
+		arc.currentUsage += len(key) + len(value) 
+		arc.len += 1
+
+		for (arc.RemainingStorage() < 0) {
+			evict_key := nil // TODO: chose which key to evict next
+			_, ok := arc.Remove(evict_key)
+			if !ok {
+				log.Fatalf("Remove failed in Set")
+			}
+		}
+		arc.T[key] = entry{key, value}
+		// TODO: update cache order and split index - confirm this is correct after get is finished
+		arc.cacheOrder = insert(arc.cacheOrder, arc.splitIndex-1, key) 
+		arc.splitIndex += 1
+		arc.Get(key) // mark as used
+
+	} else {
+		if (arc.RemainingStorage() + len(val.Value) - len(value) < 0) {
+			return false
+		}
+
+		arc.T[key].Value = value
+		arc.currentUsage = (arc.currentUsage - len(val.Value)) + len(value)
+		arc.Get(key) // mark as used
+	}
+
+	return true
 }
 
 // Len returns the number of bindings in the ARC.
 func (arc *ARC) Len() int {
-	return arc.currentUsage
+	return arc.len
+}
+
+func (arc *ARC) GetIndex(key string) int {
+	for i := 0; i < arc.limit; i++ {
+		if key == arc.cacheOrder[i] {
+			return i
+		}
+	}
+	return -1
+}
+
+func insert(a []string, index string, value string) []string {
+    if len(a) == index { 
+        return append(a, value)
+    }
+    a = append(a[:index+1], a[index:]...) 
+    a[index] = value
+    return a
 }
