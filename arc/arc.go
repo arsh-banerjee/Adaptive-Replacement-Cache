@@ -8,20 +8,25 @@ Description:
 package arc
 
 import (
-	"sync"
 	"log"
+	"sync"
 )
 
 type ARC struct {
 	limit        int
 	currentUsage int
-	len			 int
+	len          int
 	T            map[string]*entry
 	splitIndex   int //Index that divides T into t1 and t2. cacheOrder[splitIndex] is the last element in T1
-	b1           map[string]string
-	b2           map[string]string
-	cacheOrder   []string // represents the order of cache entries
-	lock         *sync.Mutex
+
+	// TODO: ensure that b1/b2 do not exceed a size of limit, and update
+	// all functions to check for the size of b1/b2 before adding new entries
+	b1         map[string]string
+	b2         map[string]string
+	cacheOrder []string // represents the order of cache entries.
+	// cacheOrder[0] represents the most recent cache entry,
+	// while cacheOrder[arc.limit - 1] represents the most frequently used
+	lock *sync.Mutex
 }
 
 type entry struct {
@@ -76,13 +81,13 @@ func (arc *ARC) Get(key string) (value []byte, ok bool) {
 		} else {
 			// if in LFU portion of cache, move the cache entry to the front of the LFU list
 			val := arc.cacheOrder[index]
-			temp := arc.cacheOrder[arc.splitIndex+1]
-			for i := arc.splitIndex + 1; i <= index; i++ {
+			temp := val
+			for i := index; i < arc.limit-1; i++ {
 				innerTemp := arc.cacheOrder[i]
 				arc.cacheOrder[i] = temp
 				temp = innerTemp
 			}
-			arc.cacheOrder[arc.splitIndex+1] = val
+			arc.cacheOrder[arc.limit-1] = val
 
 		}
 		return val.Value, true
@@ -90,6 +95,14 @@ func (arc *ARC) Get(key string) (value []byte, ok bool) {
 
 	_, prsB1 := arc.b1[key]
 	if prsB1 {
+		// evict a key from T2, expand T1, and put the key into B2
+		evictedKey := arc.cacheOrder[arc.splitIndex+1]
+		if evictedKey != "" {
+			arc.b2[evictedKey] = evictedKey
+			arc.cacheOrder[arc.splitIndex+1] = ""
+			delete(arc.T, evictedKey)
+		}
+		arc.splitIndex++
 
 		return nil, false
 
@@ -97,6 +110,13 @@ func (arc *ARC) Get(key string) (value []byte, ok bool) {
 
 	_, prsB2 := arc.b2[key]
 	if prsB2 {
+		evictedKey := arc.cacheOrder[arc.splitIndex]
+		if evictedKey != "" {
+			arc.b1[evictedKey] = evictedKey
+			arc.cacheOrder[arc.splitIndex] = ""
+			delete(arc.T, evictedKey)
+		}
+		arc.splitIndex--
 
 		return nil, false
 	}
@@ -119,7 +139,7 @@ func (arc *ARC) Remove(key string) (value []byte, ok bool) {
 	if index == -1 {
 		log.Fatalf("key not found")
 	} else {
-		arc.cacheOrder := append(arc.cacheOrder[:index], arc.cacheOrder[index+1:]...)
+		arc.cacheOrder = append(arc.cacheOrder[:index], arc.cacheOrder[index+1:]...)
 
 		// TODO: make sure this is consistent with Get
 		if index < arc.splitIndex+1 {
@@ -132,11 +152,11 @@ func (arc *ARC) Remove(key string) (value []byte, ok bool) {
 	delete(arc.T, key)
 
 	// Update b1 / b2
-	_, ok := arc.b1[key]
+	_, ok = arc.b1[key]
 	if ok {
 		delete(arc.b1, key)
 	}
-	_, ok := arc.b1[key]
+	_, ok = arc.b1[key]
 
 	if ok {
 		delete(arc.b2, key)
@@ -154,17 +174,17 @@ func (arc *ARC) Set(key string, value []byte) bool {
 	arc.lock.Lock()
 	defer arc.lock.Unlock()
 
-	if len(value) + len(key) > arc.limit {
+	if len(value)+len(key) > arc.limit {
 		return false
 	}
 
 	val, ok := arc.T[key]
 
 	if !ok {
-		arc.currentUsage += len(key) + len(value) 
+		arc.currentUsage += len(key) + len(value)
 		arc.len += 1
 
-		for (arc.RemainingStorage() < 0) {
+		for arc.RemainingStorage() < 0 {
 			evict_key := nil // TODO: chose which key to evict next
 			_, ok := arc.Remove(evict_key)
 			if !ok {
@@ -173,12 +193,12 @@ func (arc *ARC) Set(key string, value []byte) bool {
 		}
 		arc.T[key] = entry{key, value}
 		// TODO: update cache order and split index - confirm this is correct after get is finished
-		arc.cacheOrder = insert(arc.cacheOrder, arc.splitIndex-1, key) 
+		arc.cacheOrder = insert(arc.cacheOrder, arc.splitIndex-1, key)
 		arc.splitIndex += 1
 		arc.Get(key) // mark as used
 
 	} else {
-		if (arc.RemainingStorage() + len(val.Value) - len(value) < 0) {
+		if arc.RemainingStorage()+len(val.Value)-len(value) < 0 {
 			return false
 		}
 
@@ -205,10 +225,10 @@ func (arc *ARC) GetIndex(key string) int {
 }
 
 func insert(a []string, index string, value string) []string {
-    if len(a) == index { 
-        return append(a, value)
-    }
-    a = append(a[:index+1], a[index:]...) 
-    a[index] = value
-    return a
+	if len(a) == index {
+		return append(a, value)
+	}
+	a = append(a[:index+1], a[index:]...)
+	a[index] = value
+	return a
 }
