@@ -26,7 +26,13 @@ type ARC struct {
 	cacheOrder []string // represents the order of cache entries.
 	// cacheOrder[0] represents the most recent cache entry,
 	// while cacheOrder[arc.limit - 1] represents the most frequently used
-	lock *sync.Mutex
+
+	// represents the order of the entries b1/b2 cache. b#CacheOrder[0] represents the most recently added
+	b1CacheOrder []string
+	b2CacheOrder []string
+	b1Size       int
+	b2Size       int
+	lock         *sync.Mutex
 }
 
 type entry struct {
@@ -45,6 +51,10 @@ func NewArc(limit int) *ARC {
 		b1:           make(map[string]string),
 		b2:           make(map[string]string),
 		cacheOrder:   make([]string, limit),
+		b1CacheOrder: make([]string, limit),
+		b1Size:       0,
+		b2CacheOrder: make([]string, limit),
+		b2Size:       0,
 	}
 }
 
@@ -107,9 +117,17 @@ func (arc *ARC) Get(key string) (value []byte, ok bool) {
 		// evict a key from T2, expand T1, and put the key into B2
 		evictedKey := arc.cacheOrder[arc.splitIndex+1]
 		if evictedKey != "" {
-			arc.b2[evictedKey] = evictedKey
 			arc.cacheOrder[arc.splitIndex+1] = ""
 			delete(arc.T, evictedKey)
+
+			if arc.b2Size >= arc.limit {
+				b2EvictedKey := arc.b2CacheOrder[len(arc.b2CacheOrder)-1]
+				delete(arc.b2, b2EvictedKey)
+			}
+			for i := len(arc.b2CacheOrder) - 1; i > 0; i++ {
+				arc.b2CacheOrder[i] = arc.b2CacheOrder[i-1]
+			}
+			arc.b2[evictedKey] = evictedKey
 		}
 		arc.splitIndex++
 
@@ -119,11 +137,21 @@ func (arc *ARC) Get(key string) (value []byte, ok bool) {
 
 	_, prsB2 := arc.b2[key]
 	if prsB2 {
+		// evict a key from T1, expand T2, and put the key into B1
 		evictedKey := arc.cacheOrder[arc.splitIndex]
 		if evictedKey != "" {
 			arc.b1[evictedKey] = evictedKey
 			arc.cacheOrder[arc.splitIndex] = ""
 			delete(arc.T, evictedKey)
+
+			if arc.b1Size >= arc.limit {
+				b1EvictedKey := arc.b1CacheOrder[len(arc.b1CacheOrder)-1]
+				delete(arc.b1, b1EvictedKey)
+			}
+			for i := len(arc.b1CacheOrder) - 1; i > 0; i++ {
+				arc.b1CacheOrder[i] = arc.b1CacheOrder[i-1]
+			}
+			arc.b1[evictedKey] = evictedKey
 		}
 		arc.splitIndex--
 
@@ -153,9 +181,9 @@ func (arc *ARC) Remove(key string) (value []byte, ok bool) {
 
 		// TODO: make sure this is consistent with Get
 		if index < arc.splitIndex+1 {
-			arc.splitIndex -= 1
+			arc.splitIndex--
 		} else {
-			arc.splitIndex += 1
+			arc.splitIndex++
 		}
 	}
 
