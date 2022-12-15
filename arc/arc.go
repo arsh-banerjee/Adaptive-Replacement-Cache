@@ -98,7 +98,7 @@ func (arc *ARC) Get(key string) (value []byte, ok bool) {
 			arc.splitIndex--
 
 		} else {
-			// if in LFU portion of cache, move the cache entry to the front of the LFU list
+
 			keyVal := arc.cacheOrder[index]
 			temp := keyVal
 			for i := index; i < len(arc.cacheOrder)-1; i++ {
@@ -177,19 +177,28 @@ func (arc *ARC) Remove(key string) (value []byte, ok bool) {
 	if index == -1 {
 		log.Fatalf("key not found")
 	} else {
-		arc.cacheOrder = append(arc.cacheOrder[:index], arc.cacheOrder[index+1:]...)
 
-		// TODO: make sure this is consistent with Get
+		// if in the LRU part of the cache
 		if index < arc.splitIndex+1 {
+			for i := index; i < arc.splitIndex; i++ {
+				arc.cacheOrder[i] = arc.cacheOrder[i+1]
+
+			}
+			arc.cacheOrder[arc.splitIndex] = ""
 			arc.splitIndex--
+
+			// if in the LFU part of the cache
 		} else {
-			arc.splitIndex++
+			for i := index; i > arc.splitIndex+1; i-- {
+				arc.cacheOrder[i] = arc.cacheOrder[i-1]
+			}
+			arc.cacheOrder[arc.splitIndex+1] = ""
 		}
 	}
-
 	delete(arc.T, key)
 
 	// Update b1 / b2
+	// TODO: Should this add the removed key into its respective b1/b2 list?
 	_, ok = arc.b1[key]
 	if ok {
 		delete(arc.b1, key)
