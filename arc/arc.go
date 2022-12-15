@@ -185,13 +185,13 @@ func (arc *ARC) Set(key string, value []byte) bool {
 		arc.len += 1
 
 		for arc.RemainingStorage() < 0 {
-			evict_key := nil // TODO: chose which key to evict next
+			evict_key := arc.cacheOrder[0] // Evicting from L1, least recently used
 			_, ok := arc.Remove(evict_key)
 			if !ok {
 				log.Fatalf("Remove failed in Set")
 			}
 		}
-		arc.T[key] = entry{key, value}
+		arc.T[key] = &entry{Key: key, Value: value}
 		// TODO: update cache order and split index - confirm this is correct after get is finished
 		arc.cacheOrder = insert(arc.cacheOrder, arc.splitIndex-1, key)
 		arc.splitIndex += 1
@@ -224,7 +224,7 @@ func (arc *ARC) GetIndex(key string) int {
 	return -1
 }
 
-func insert(a []string, index string, value string) []string {
+func insert(a []string, index int, value string) []string {
 	if len(a) == index {
 		return append(a, value)
 	}
