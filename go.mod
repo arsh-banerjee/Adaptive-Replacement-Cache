@@ -1,3 +1,3 @@
-module example.com/m
+module arc
 
 go 1.18

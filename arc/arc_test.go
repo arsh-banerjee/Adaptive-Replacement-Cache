@@ -8,11 +8,47 @@ Description:
 package arc
 
 import (
+	"log"
+	"strconv"
 	"testing"
 	"fmt"
 )
 
 // Helper Functions:
+// Checks to see if Get exists and returns correct value
+func confirmGet(arc *ARC, val string) {
+	Val, err := arc.Get(val)
+	if err != true {
+		log.Fatalf("Key: %s not found", val)
+	}
+	Value := string(Val)
+	if Value != val {
+		log.Fatalf("Get of key: %s is %s, should be %s", val, Value, val)
+	}
+}
+
+// Turns cache into readable string with x demarcating empty slots
+func CacheToStr(order []string) string {
+	st := ""
+	for i := 0; i < len(order); i++ {
+		if order[i] == "" {
+			st += "x "
+		} else {
+			st += order[i] + " "
+		}
+	}
+	return st
+}
+
+// Prints out all caches for easy debugging
+func PrintAll(arc * ARC) {
+	fmt.Println(CacheToStr(arc.cacheOrder[:arc.splitIndex+1]))		
+	fmt.Println(CacheToStr(arc.cacheOrder[arc.splitIndex+1:]))		
+	fmt.Println(CacheToStr(arc.b1CacheOrder))		
+	fmt.Println(CacheToStr(arc.b2CacheOrder))		
+}
+
+// Tests:
 
 func TestArcInit(t *testing.T) {
 	fmt.Println("Testing init..")
@@ -33,6 +69,34 @@ func TestTooSmallArcInit(t *testing.T) {
 
 	if NewArc(0) != nil || NewArc(1) != nil {
 		t.Errorf("initializing an ARC object even when size is incorrect")
+	}
+}
+
+func TestAddingUntilCapacity(t *testing.T) {
+	arc := NewArc(16)
+	if arc == nil {
+		t.Errorf("Error initializing ARC")
+	}
+
+	values := []int{1, 2, 3, 4, 5, 6, 7, 8}
+
+	for i := 0; i < len(values); i++ {
+		val := strconv.Itoa(i)
+		arc.Set(val, []byte(val))
+	}
+}
+
+func TestAddingUntilCapacity(t *testing.T) {
+	arc := NewArc(16)
+	if arc == nil {
+		t.Errorf("Error initializing ARC")
+	}
+
+	values := []int{1, 2, 3, 4, 5, 6, 7, 8}
+
+	for i := 0; i < len(values); i++ {
+		val := strconv.Itoa(i)
+		arc.Set(val, []byte(val))
 	}
 }
 
@@ -170,23 +234,4 @@ func TestGhostBuffer(t *testing.T) {
 		fmt.Println(CacheToStr(arc.cacheOrder[:arc.splitIndex+1]))		
 		t.Errorf("Error set")
 	}
-}
-
-func CacheToStr(order []string) string {
-	st := ""
-	for i := 0; i < len(order); i++ {
-		if order[i] == "" {
-			st += "x "
-		} else {
-			st += order[i] + " "
-		}
-	}
-	return st
-}
-
-func PrintAll(arc * ARC) {
-	fmt.Println(CacheToStr(arc.cacheOrder[:arc.splitIndex+1]))		
-	fmt.Println(CacheToStr(arc.cacheOrder[arc.splitIndex+1:]))		
-	fmt.Println(CacheToStr(arc.b1CacheOrder))		
-	fmt.Println(CacheToStr(arc.b2CacheOrder))		
 }
