@@ -76,18 +76,26 @@ func (arc *ARC) Get(key string) (value []byte, ok bool) {
 			}
 		}
 		// if in LRU portion of cache
+		// move key to LFU portion of cache, shift everything to the left
 		if index < arc.splitIndex+1 {
+			keyVal := arc.cacheOrder[index]
+			for i := index; i < len(arc.cacheOrder)-1; i++ {
+				arc.cacheOrder[i] = arc.cacheOrder[i+1]
+
+			}
+			arc.cacheOrder[len(arc.cacheOrder)-1] = keyVal
+			arc.splitIndex--
 
 		} else {
 			// if in LFU portion of cache, move the cache entry to the front of the LFU list
-			val := arc.cacheOrder[index]
-			temp := val
-			for i := index; i < arc.limit-1; i++ {
+			keyVal := arc.cacheOrder[index]
+			temp := keyVal
+			for i := index; i < len(arc.cacheOrder)-1; i++ {
 				innerTemp := arc.cacheOrder[i]
 				arc.cacheOrder[i] = temp
 				temp = innerTemp
 			}
-			arc.cacheOrder[arc.limit-1] = val
+			arc.cacheOrder[arc.limit-1] = keyVal
 
 		}
 		return val.Value, true
