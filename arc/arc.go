@@ -10,6 +10,7 @@ package arc
 import (
 	"log"
 	"sync"
+	"fmt"
 )
 
 type ARC struct {
@@ -42,6 +43,10 @@ type entry struct {
 
 // NewARC returns a pointer to a new ARC with a capacity to store limit bytes
 func NewArc(limit int) *ARC {
+
+	if limit < 2 {
+		return nil
+	}
 	return &ARC{
 		limit:        limit,
 		lock:         new(sync.Mutex),
@@ -65,8 +70,8 @@ func (arc *ARC) MaxStorage() int {
 
 // RemainingStorage returns the number of unused bytes available in this ARC
 func (arc *ARC) RemainingStorage() int {
-	arc.lock.Lock()
-	defer arc.lock.Unlock()
+	// arc.lock.Lock()
+	// defer arc.lock.Unlock()
 
 	return arc.limit - arc.currentUsage
 }
@@ -74,8 +79,9 @@ func (arc *ARC) RemainingStorage() int {
 // Get returns the value associated with the given key, if it exists.
 // ok is true if a value was found and false otherwise.
 func (arc *ARC) Get(key string) (value []byte, ok bool) {
-	arc.lock.Lock()
-	defer arc.lock.Unlock()
+	// arc.lock.Lock()
+	// defer arc.lock.Unlock()
+	fmt.Printf("")
 	val, prs := arc.T[key]
 
 	if prs {
@@ -92,22 +98,20 @@ func (arc *ARC) Get(key string) (value []byte, ok bool) {
 			keyVal := arc.cacheOrder[index]
 			for i := index; i < len(arc.cacheOrder)-1; i++ {
 				arc.cacheOrder[i] = arc.cacheOrder[i+1]
-
 			}
 			arc.cacheOrder[len(arc.cacheOrder)-1] = keyVal
 			arc.splitIndex--
 
 		} else {
-
 			keyVal := arc.cacheOrder[index]
-			temp := keyVal
+			// temp := keyVal
 			for i := index; i < len(arc.cacheOrder)-1; i++ {
-				innerTemp := arc.cacheOrder[i]
-				arc.cacheOrder[i] = temp
-				temp = innerTemp
+				arc.cacheOrder[i] = arc.cacheOrder[i+1]
+				// innerTemp := arc.cacheOrder[i]
+				// arc.cacheOrder[i] = temp
+				// temp = innerTemp
 			}
 			arc.cacheOrder[arc.limit-1] = keyVal
-
 		}
 		return val.Value, true
 	}
@@ -118,16 +122,21 @@ func (arc *ARC) Get(key string) (value []byte, ok bool) {
 		evictedKey := arc.cacheOrder[arc.splitIndex+1]
 		if evictedKey != "" {
 			arc.cacheOrder[arc.splitIndex+1] = ""
+			arc.currentUsage -= (len(evictedKey) + len(arc.T[evictedKey].Value))
+			arc.len -= 1
 			delete(arc.T, evictedKey)
 
 			if arc.b2Size >= arc.limit {
 				b2EvictedKey := arc.b2CacheOrder[len(arc.b2CacheOrder)-1]
 				delete(arc.b2, b2EvictedKey)
+				arc.b2Size--
 			}
-			for i := len(arc.b2CacheOrder) - 1; i > 0; i++ {
+			for i := len(arc.b2CacheOrder) - 1; i > 0; i-- {
 				arc.b2CacheOrder[i] = arc.b2CacheOrder[i-1]
 			}
+			arc.b2CacheOrder[0] = evictedKey
 			arc.b2[evictedKey] = evictedKey
+			arc.b2Size++
 		}
 		arc.splitIndex++
 
@@ -142,16 +151,21 @@ func (arc *ARC) Get(key string) (value []byte, ok bool) {
 		if evictedKey != "" {
 			arc.b1[evictedKey] = evictedKey
 			arc.cacheOrder[arc.splitIndex] = ""
+			arc.currentUsage -= len(evictedKey) + len(arc.T[evictedKey].Value)
+			arc.len -= 1
 			delete(arc.T, evictedKey)
 
 			if arc.b1Size >= arc.limit {
 				b1EvictedKey := arc.b1CacheOrder[len(arc.b1CacheOrder)-1]
 				delete(arc.b1, b1EvictedKey)
+				arc.b1Size--
 			}
-			for i := len(arc.b1CacheOrder) - 1; i > 0; i++ {
+			for i := len(arc.b1CacheOrder) - 1; i > 0; i-- {
 				arc.b1CacheOrder[i] = arc.b1CacheOrder[i-1]
 			}
+			arc.b1CacheOrder[0] = evictedKey
 			arc.b1[evictedKey] = evictedKey
+			arc.b1Size++
 		}
 		arc.splitIndex--
 
@@ -164,8 +178,8 @@ func (arc *ARC) Get(key string) (value []byte, ok bool) {
 // Remove removes and returns the value associated with the given key, if it exists.
 // ok is true if a value was found and false otherwise
 func (arc *ARC) Remove(key string) (value []byte, ok bool) {
-	arc.lock.Lock()
-	defer arc.lock.Unlock()
+	// arc.lock.Lock()
+	// defer arc.lock.Unlock()
 	val, ok := arc.T[key]
 
 	if !ok {
@@ -173,41 +187,53 @@ func (arc *ARC) Remove(key string) (value []byte, ok bool) {
 	}
 
 	index := arc.GetIndex(key)
+	evictedKey := arc.cacheOrder[index]
 
 	if index == -1 {
 		log.Fatalf("key not found")
 	} else {
-
 		// if in the LRU part of the cache
 		if index < arc.splitIndex+1 {
 			for i := index; i < arc.splitIndex; i++ {
 				arc.cacheOrder[i] = arc.cacheOrder[i+1]
-
 			}
 			arc.cacheOrder[arc.splitIndex] = ""
 			arc.splitIndex--
 
-			// if in the LFU part of the cache
+			// add to b1
+			if arc.b1Size >= arc.limit {
+				b1EvictedKey := arc.b1CacheOrder[len(arc.b1CacheOrder)-1]
+				delete(arc.b1, b1EvictedKey)
+				arc.b1Size--
+			}
+			for i := len(arc.b1CacheOrder) - 1; i > 0; i-- {
+				arc.b1CacheOrder[i] = arc.b1CacheOrder[i-1]
+			}
+			arc.b1CacheOrder[0] = evictedKey
+			arc.b1[evictedKey] = evictedKey
+			arc.b1Size++
+
+		// if in the LFU part of the cache
 		} else {
 			for i := index; i > arc.splitIndex+1; i-- {
 				arc.cacheOrder[i] = arc.cacheOrder[i-1]
 			}
 			arc.cacheOrder[arc.splitIndex+1] = ""
+
+			if arc.b2Size >= arc.limit {
+				b2EvictedKey := arc.b2CacheOrder[len(arc.b2CacheOrder)-1]
+				delete(arc.b2, b2EvictedKey)
+				arc.b2Size--
+			}
+			for i := len(arc.b2CacheOrder) - 1; i > 0; i-- {
+				arc.b2CacheOrder[i] = arc.b2CacheOrder[i-1]
+			}
+			arc.b2CacheOrder[0] = evictedKey
+			arc.b2[evictedKey] = evictedKey
+			arc.b2Size++	
 		}
 	}
 	delete(arc.T, key)
-
-	// Update b1 / b2
-	// TODO: Should this add the removed key into its respective b1/b2 list?
-	_, ok = arc.b1[key]
-	if ok {
-		delete(arc.b1, key)
-	}
-	_, ok = arc.b1[key]
-
-	if ok {
-		delete(arc.b2, key)
-	}
 
 	arc.currentUsage -= (len(val.Value) + len(val.Key))
 	arc.len -= 1
@@ -218,8 +244,8 @@ func (arc *ARC) Remove(key string) (value []byte, ok bool) {
 // Set associates the given value with the given key, possibly evicting values
 // to make room. Returns true if the binding was added successfully, else false.
 func (arc *ARC) Set(key string, value []byte) bool {
-	arc.lock.Lock()
-	defer arc.lock.Unlock()
+	// arc.lock.Lock()
+	// defer arc.lock.Unlock()
 
 	if len(value)+len(key) > arc.limit {
 		return false
@@ -232,17 +258,53 @@ func (arc *ARC) Set(key string, value []byte) bool {
 		arc.len += 1
 
 		for arc.RemainingStorage() < 0 {
-			evict_key := arc.cacheOrder[0] // Evicting from L1, least recently used
+			k := arc.splitIndex
+			var evict_key string
+			for {
+				evict_key = arc.cacheOrder[k] // Evicting from L1, LRU
+				if evict_key != "" {
+					break
+				}
+				k--
+			}
 			_, ok := arc.Remove(evict_key)
 			if !ok {
 				log.Fatalf("Remove failed in Set")
 			}
 		}
+		
 		arc.T[key] = &entry{Key: key, Value: value}
-		// TODO: update cache order and split index - confirm this is correct after get is finished
-		arc.cacheOrder = insert(arc.cacheOrder, arc.splitIndex-1, key)
-		arc.splitIndex += 1
-		arc.Get(key) // mark as used
+
+		temp := key
+		for i := 0; i <= arc.splitIndex; i++{
+			if arc.cacheOrder[i] == "" {
+				arc.cacheOrder[i] = temp
+				break
+			} 
+			inner_temp := arc.cacheOrder[i]
+			arc.cacheOrder[i] = temp
+			temp = inner_temp
+
+			if i == arc.splitIndex && temp != "" {
+				if arc.b1Size >= arc.limit {
+					b1EvictedKey := arc.b1CacheOrder[len(arc.b1CacheOrder)-1]
+					delete(arc.b1, b1EvictedKey)
+					arc.b1Size--
+				}
+				for i := len(arc.b1CacheOrder) - 1; i > 0; i-- {
+					arc.b1CacheOrder[i] = arc.b1CacheOrder[i-1]
+				}
+				arc.b1CacheOrder[0] = temp
+				arc.b1[temp] = temp
+				arc.b1Size++
+
+				arc.currentUsage -= len(temp) + len(arc.T[temp].Value)
+				arc.len -= 1
+
+				delete(arc.T, temp)
+			}
+		}
+		arc.cacheOrder[0] = key
 
 	} else {
 		if arc.RemainingStorage()+len(val.Value)-len(value) < 0 {
@@ -253,7 +315,6 @@ func (arc *ARC) Set(key string, value []byte) bool {
 		arc.currentUsage = (arc.currentUsage - len(val.Value)) + len(value)
 		arc.Get(key) // mark as used
 	}
-
 	return true
 }
 
