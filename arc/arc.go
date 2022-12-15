@@ -64,7 +64,8 @@ func (arc *ARC) RemainingStorage() int {
 // Get returns the value associated with the given key, if it exists.
 // ok is true if a value was found and false otherwise.
 func (arc *ARC) Get(key string) (value []byte, ok bool) {
-
+	arc.lock.Lock()
+	defer arc.lock.Unlock()
 	val, prs := arc.T[key]
 
 	if prs {
@@ -135,7 +136,8 @@ func (arc *ARC) Get(key string) (value []byte, ok bool) {
 // Remove removes and returns the value associated with the given key, if it exists.
 // ok is true if a value was found and false otherwise
 func (arc *ARC) Remove(key string) (value []byte, ok bool) {
-
+	arc.lock.Lock()
+	defer arc.lock.Unlock()
 	val, ok := arc.T[key]
 
 	if !ok {
