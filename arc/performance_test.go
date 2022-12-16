@@ -27,15 +27,15 @@ func round(num float64) int {
 
 // Normal Distribution (Not realistic workload)
 func TestCacheBenchmark(t *testing.T) {
-	capacity := 1000
-	cache := NewArc(capacity)
+	capacity := 10000
+	cache := NewLru(capacity)
 
 	rand.Seed(2)
 
-	tracesize := capacity * 10
-	var trace [10000]int
+	tracesize := 100000
+	var trace [100000]int
 	for i := 0; i < tracesize; i++ {
-		trace[i] = rand.Intn(capacity)
+		trace[i] = rand.Intn(5000)
 		cache.Set(strconv.Itoa(trace[i]), []byte(""))
 	}
 
@@ -43,7 +43,7 @@ func TestCacheBenchmark(t *testing.T) {
 	misses := 0
 
 	for i := 0; i < tracesize; i++ {
-		trace[i] = rand.Intn(capacity)
+		trace[i] = rand.Intn(5000)
 		_, prs := cache.Get(strconv.Itoa(trace[i]))
 		if prs {
 			hits += 1
@@ -59,34 +59,37 @@ func TestCacheBenchmark(t *testing.T) {
 
 //Exponential Distribution (More realistic web workload - some are visited way more than others)
 func TestCacheBenchmark2(t *testing.T) {
-	capacity := 1000
-	cache := NewLru(capacity)
+	capacities := []int{10000, 12000, 14000, 16000, 18000, 20000}
 
-	rand.Seed(2)
+	for i := 0; i < len(capacities); i++ {
+		capacity := capacities[i]
+		cache := NewLru(capacity)
 
-	tracesize := capacity * 10
-	var trace [10000]float64
-	for i := 0; i < tracesize; i++ {
-		trace[i] = toFixed(rand.ExpFloat64(), 2)
-		s := fmt.Sprintf("%f", trace[i])
-		cache.Set(s, []byte(""))
-	}
+		rand.Seed(2)
 
-	hits := 0
-	misses := 0
-
-	for i := 0; i < tracesize; i++ {
-		trace[i] = toFixed(rand.ExpFloat64(), 3)
-		s := fmt.Sprintf("%f", trace[i])
-		_, prs := cache.Get(s)
-		if prs {
-			hits += 1
-		} else {
-			misses += 1
+		tracesize := 100000
+		var trace [100000]float64
+		for i := 0; i < tracesize; i++ {
+			trace[i] = toFixed(rand.ExpFloat64(), 3)
+			s := fmt.Sprintf("%f", trace[i])
+			cache.Set(s, []byte(""))
 		}
+
+		hits := 0
+		misses := 0
+
+		for i := 0; i < tracesize; i++ {
+			trace[i] = toFixed(rand.ExpFloat64(), 3)
+			s := fmt.Sprintf("%f", trace[i])
+			_, prs := cache.Get(s)
+			if prs {
+				hits += 1
+			} else {
+				misses += 1
+			}
+		}
+
+		ratio := float64(hits) / (float64(hits) + float64(misses))
+		t.Logf("ARC of size %d: hits: %d | misses: %d | hit-ratio: %f", capacity, hits, misses, ratio)
 	}
-
-	ratio := float64(hits) / (float64(hits) + float64(misses))
-	t.Logf("ARC of size %d: hits: %d | misses: %d | hit-ratio: %f", capacity, hits, misses, ratio)
-
 }
