@@ -8,9 +8,9 @@ Description:
 package arc
 
 import (
+	"fmt"
 	"log"
 	"sync"
-	"fmt"
 )
 
 type ARC struct {
@@ -50,6 +50,7 @@ func NewArc(limit int) *ARC {
 	return &ARC{
 		limit:        limit,
 		lock:         new(sync.Mutex),
+		len:          0,
 		currentUsage: 0,
 		T:            make(map[string]*entry, limit),
 		splitIndex:   int(limit/2) - 1,
@@ -102,16 +103,13 @@ func (arc *ARC) Get(key string) (value []byte, ok bool) {
 			arc.cacheOrder[len(arc.cacheOrder)-1] = keyVal
 			arc.splitIndex--
 
+			// if in LFU portion of cache, move key to front of LFU by shifting everything left
 		} else {
 			keyVal := arc.cacheOrder[index]
-			// temp := keyVal
 			for i := index; i < len(arc.cacheOrder)-1; i++ {
 				arc.cacheOrder[i] = arc.cacheOrder[i+1]
-				// innerTemp := arc.cacheOrder[i]
-				// arc.cacheOrder[i] = temp
-				// temp = innerTemp
 			}
-			arc.cacheOrder[arc.limit-1] = keyVal
+			arc.cacheOrder[len(arc.cacheOrder)-1] = keyVal
 		}
 		return val.Value, true
 	}
@@ -149,7 +147,6 @@ func (arc *ARC) Get(key string) (value []byte, ok bool) {
 		// evict a key from T1, expand T2, and put the key into B1
 		evictedKey := arc.cacheOrder[arc.splitIndex]
 		if evictedKey != "" {
-			arc.b1[evictedKey] = evictedKey
 			arc.cacheOrder[arc.splitIndex] = ""
 			arc.currentUsage -= len(evictedKey) + len(arc.T[evictedKey].Value)
 			arc.len -= 1
@@ -198,7 +195,6 @@ func (arc *ARC) Remove(key string) (value []byte, ok bool) {
 				arc.cacheOrder[i] = arc.cacheOrder[i+1]
 			}
 			arc.cacheOrder[arc.splitIndex] = ""
-			arc.splitIndex--
 
 			// add to b1
 			if arc.b1Size >= arc.limit {
@@ -213,7 +209,7 @@ func (arc *ARC) Remove(key string) (value []byte, ok bool) {
 			arc.b1[evictedKey] = evictedKey
 			arc.b1Size++
 
-		// if in the LFU part of the cache
+			// if in the LFU part of the cache
 		} else {
 			for i := index; i > arc.splitIndex+1; i-- {
 				arc.cacheOrder[i] = arc.cacheOrder[i-1]
@@ -230,7 +226,7 @@ func (arc *ARC) Remove(key string) (value []byte, ok bool) {
 			}
 			arc.b2CacheOrder[0] = evictedKey
 			arc.b2[evictedKey] = evictedKey
-			arc.b2Size++	
+			arc.b2Size++
 		}
 	}
 	delete(arc.T, key)
@@ -272,15 +268,15 @@ func (arc *ARC) Set(key string, value []byte) bool {
 				log.Fatalf("Remove failed in Set")
 			}
 		}
-		
+
 		arc.T[key] = &entry{Key: key, Value: value}
 
 		temp := key
-		for i := 0; i <= arc.splitIndex; i++{
+		for i := 0; i <= arc.splitIndex; i++ {
 			if arc.cacheOrder[i] == "" {
 				arc.cacheOrder[i] = temp
 				break
-			} 
+			}
 			inner_temp := arc.cacheOrder[i]
 			arc.cacheOrder[i] = temp
 			temp = inner_temp
