@@ -8,10 +8,10 @@ Description:
 package arc
 
 import (
+	"fmt"
 	"log"
 	"strconv"
 	"testing"
-	"fmt"
 )
 
 // Helper Functions:
@@ -41,11 +41,11 @@ func CacheToStr(order []string) string {
 }
 
 // Prints out all caches for easy debugging
-func PrintAll(arc * ARC) {
-	fmt.Println(CacheToStr(arc.cacheOrder[:arc.splitIndex+1]))		
-	fmt.Println(CacheToStr(arc.cacheOrder[arc.splitIndex+1:]))		
-	fmt.Println(CacheToStr(arc.b1CacheOrder))		
-	fmt.Println(CacheToStr(arc.b2CacheOrder))		
+func PrintAll(arc *ARC) {
+	fmt.Println(CacheToStr(arc.cacheOrder[:arc.splitIndex+1]))
+	fmt.Println(CacheToStr(arc.cacheOrder[arc.splitIndex+1:]))
+	fmt.Println(CacheToStr(arc.b1CacheOrder))
+	fmt.Println(CacheToStr(arc.b2CacheOrder))
 }
 
 // Tests:
@@ -69,20 +69,6 @@ func TestTooSmallArcInit(t *testing.T) {
 
 	if NewArc(0) != nil || NewArc(1) != nil {
 		t.Errorf("initializing an ARC object even when size is incorrect")
-	}
-}
-
-func TestAddingUntilCapacity(t *testing.T) {
-	arc := NewArc(16)
-	if arc == nil {
-		t.Errorf("Error initializing ARC")
-	}
-
-	values := []int{1, 2, 3, 4, 5, 6, 7, 8}
-
-	for i := 0; i < len(values); i++ {
-		val := strconv.Itoa(i)
-		arc.Set(val, []byte(val))
 	}
 }
 
@@ -124,7 +110,7 @@ func TestBasicSetGet(t *testing.T) {
 	arc.Set("d", []byte{'d'})
 
 	if CacheToStr(arc.cacheOrder[:arc.splitIndex+1]) != "d c b a " {
-		fmt.Println(CacheToStr(arc.cacheOrder[:arc.splitIndex+1]))		
+		fmt.Println(CacheToStr(arc.cacheOrder[:arc.splitIndex+1]))
 		t.Errorf("Error set")
 	}
 
@@ -135,7 +121,7 @@ func TestBasicSetGet(t *testing.T) {
 	arc.Set("b", []byte{'b'})
 
 	if CacheToStr(arc.cacheOrder[:arc.splitIndex+1]) != "d c a " {
-		fmt.Println(CacheToStr(arc.cacheOrder[:arc.splitIndex+1]))		
+		fmt.Println(CacheToStr(arc.cacheOrder[:arc.splitIndex+1]))
 		t.Errorf("Error set")
 	}
 
@@ -143,41 +129,41 @@ func TestBasicSetGet(t *testing.T) {
 		t.Errorf("Error set")
 	}
 
-	arc.Get("a") 
+	arc.Get("a")
 
 	if CacheToStr(arc.cacheOrder[:arc.splitIndex+1]) != "d c " {
-		fmt.Println(CacheToStr(arc.cacheOrder[:arc.splitIndex+1]))		
+		fmt.Println(CacheToStr(arc.cacheOrder[:arc.splitIndex+1]))
 		t.Errorf("Error get")
 	}
 
 	if CacheToStr(arc.cacheOrder[arc.splitIndex+1:]) != "x x x x b a " {
-		fmt.Println(CacheToStr(arc.cacheOrder[arc.splitIndex+1:]))		
+		fmt.Println(CacheToStr(arc.cacheOrder[arc.splitIndex+1:]))
 		t.Errorf("Error get")
-	}	
+	}
 
 	arc.Get("b")
 
 	if CacheToStr(arc.cacheOrder[:arc.splitIndex+1]) != "d c " {
-		fmt.Println(CacheToStr(arc.cacheOrder[:arc.splitIndex+1]))		
+		fmt.Println(CacheToStr(arc.cacheOrder[:arc.splitIndex+1]))
 		t.Errorf("Error get")
 	}
 
 	if CacheToStr(arc.cacheOrder[arc.splitIndex+1:]) != "x x x x a b " {
-		fmt.Println(CacheToStr(arc.cacheOrder[arc.splitIndex+1:]))		
+		fmt.Println(CacheToStr(arc.cacheOrder[arc.splitIndex+1:]))
 		t.Errorf("Error get")
-	}	
+	}
 
 	arc.Get("c")
 
 	if CacheToStr(arc.cacheOrder[:arc.splitIndex+1]) != "d " {
-		fmt.Println(CacheToStr(arc.cacheOrder[:arc.splitIndex+1]))		
+		fmt.Println(CacheToStr(arc.cacheOrder[:arc.splitIndex+1]))
 		t.Errorf("Error get")
 	}
 
 	if CacheToStr(arc.cacheOrder[arc.splitIndex+1:]) != "x x x x a b c " {
-		fmt.Println(CacheToStr(arc.cacheOrder[arc.splitIndex+1:]))		
+		fmt.Println(CacheToStr(arc.cacheOrder[arc.splitIndex+1:]))
 		t.Errorf("Error get")
-	}	
+	}
 
 }
 
@@ -192,7 +178,7 @@ func TestGhostBuffer(t *testing.T) {
 	arc.Set("d", []byte{'a'})
 
 	if CacheToStr(arc.cacheOrder[:arc.splitIndex+1]) != "d c b a " {
-		fmt.Println(CacheToStr(arc.cacheOrder[:arc.splitIndex+1]))		
+		fmt.Println(CacheToStr(arc.cacheOrder[:arc.splitIndex+1]))
 		t.Errorf("Error set")
 	}
 
@@ -203,12 +189,12 @@ func TestGhostBuffer(t *testing.T) {
 	arc.Set("e", []byte{'e'})
 
 	if CacheToStr(arc.cacheOrder[:arc.splitIndex+1]) != "e d c " {
-		fmt.Println(CacheToStr(arc.cacheOrder[:arc.splitIndex+1]))		
+		fmt.Println(CacheToStr(arc.cacheOrder[:arc.splitIndex+1]))
 		t.Errorf("Error set")
 	}
 
 	if CacheToStr(arc.b1CacheOrder) != "b a x x x x x x " {
-		fmt.Println(CacheToStr(arc.cacheOrder[:arc.splitIndex+1]))		
+		fmt.Println(CacheToStr(arc.cacheOrder[:arc.splitIndex+1]))
 		t.Errorf("Error set")
 	}
 
@@ -219,7 +205,7 @@ func TestGhostBuffer(t *testing.T) {
 	}
 
 	if CacheToStr(arc.cacheOrder[:arc.splitIndex+1]) != "e d c x " {
-		fmt.Println(CacheToStr(arc.cacheOrder[:arc.splitIndex+1]))		
+		fmt.Println(CacheToStr(arc.cacheOrder[:arc.splitIndex+1]))
 		t.Errorf("Error set")
 	}
 
@@ -227,11 +213,11 @@ func TestGhostBuffer(t *testing.T) {
 	arc.Get("a")
 	arc.Get("c")
 	if CacheToStr(arc.cacheOrder[:arc.splitIndex+1]) != "f e d x " {
-		fmt.Println(CacheToStr(arc.cacheOrder[:arc.splitIndex+1]))		
+		fmt.Println(CacheToStr(arc.cacheOrder[:arc.splitIndex+1]))
 		t.Errorf("Error set")
 	}
 	if CacheToStr(arc.cacheOrder[arc.splitIndex+1:]) != "x x x c " {
-		fmt.Println(CacheToStr(arc.cacheOrder[:arc.splitIndex+1]))		
+		fmt.Println(CacheToStr(arc.cacheOrder[:arc.splitIndex+1]))
 		t.Errorf("Error set")
 	}
 }

@@ -253,16 +253,32 @@ func (arc *ARC) Set(key string, value []byte) bool {
 		arc.currentUsage += len(key) + len(value)
 		arc.len += 1
 
+		switchList := false //boolean to switch between empyting LRU and LFU
+
 		for arc.RemainingStorage() < 0 {
 			k := arc.splitIndex
 			var evict_key string
-			for {
+			for !switchList {
 				evict_key = arc.cacheOrder[k] // Evicting from L1, LRU
 				if evict_key != "" {
 					break
 				}
 				k--
+				if k < 0 {
+					switchList = true
+					k = arc.splitIndex
+					break
+				}
 			}
+
+			for switchList {
+				evict_key = arc.cacheOrder[k+1]
+				if evict_key != "" {
+					break
+				}
+				k++
+			}
+
 			_, ok := arc.Remove(evict_key)
 			if !ok {
 				log.Fatalf("Remove failed in Set")
