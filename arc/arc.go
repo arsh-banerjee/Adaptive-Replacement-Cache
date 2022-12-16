@@ -1,8 +1,8 @@
 /******************************************************************************
 Filename: arc.go
 Names: Arsh Banerjee, Kenny Lam, and Kenar Vyas
-NetId: arshb
-Description:
+NetId: arshb, kennyl, kvyas
+Description: Implementation of ARC Cache
 *****************************************************************************/
 
 package arc

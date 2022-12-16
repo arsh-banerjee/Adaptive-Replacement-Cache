@@ -1,8 +1,8 @@
 /******************************************************************************
 Filename: performance_test.go
 Names: Arsh Banerjee, Kenny Lam, and Kenar Vyas
-NetId:
-Description:
+NetId: arshb, kennyl, kvyas
+Description: Performance test to compare ARC and LRU Caches
 *****************************************************************************/
 
 package arc
@@ -28,7 +28,7 @@ func round(num float64) int {
 // Normal Distribution (Not realistic workload)
 func TestCacheBenchmark(t *testing.T) {
 	capacity := 10000
-	cache := NewLru(capacity)
+	cache := NewArc(capacity)
 
 	rand.Seed(2)
 
@@ -63,7 +63,7 @@ func TestCacheBenchmark2(t *testing.T) {
 
 	for i := 0; i < len(capacities); i++ {
 		capacity := capacities[i]
-		cache := NewLru(capacity)
+		cache := NewArc(capacity)
 
 		rand.Seed(2)
 
